@@ -15,6 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/cayke1/mydrive-api/internal/config"
+	"github.com/cayke1/mydrive-api/internal/files"
 	"github.com/cayke1/mydrive-api/internal/folders"
 	"github.com/cayke1/mydrive-api/internal/storage"
 )
@@ -66,10 +67,15 @@ func main() {
 	folderService := folders.NewFolderService(folderRepo)
 	folderController := folders.NewFolderController(folderService)
 
+	fileRepo := files.NewFileRepository(dbPool)
+	fileService := files.NewFileService(fileRepo)
+	fileController := files.NewFileController(fileService)
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", healthHandler(dbPool, redisClient, storageClient))
 	folderController.RegisterRoutes(mux)
+	fileController.RegisterRoutes(mux)
 
 	server := &http.Server{
 		Addr:         "127.0.0.1:" + cfg.Port,
