@@ -10,84 +10,24 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cayke1/mydrive-api/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
-
-	"github.com/cayke1/mydrive-api/internal/config"
-	"github.com/cayke1/mydrive-api/internal/files"
-	"github.com/cayke1/mydrive-api/internal/folders"
-	"github.com/cayke1/mydrive-api/internal/storage"
 )
 
 func main() {
 	godotenv.Load()
 
-	cfg := config.Load()
-
-	log.Printf("Starting MyDrive API on port %s", cfg.Port)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	dbPool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	app, err := bootstrap()
 	if err != nil {
-		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+		log.Fatalf("Failed to initialize app: %v", err)
 	}
-	defer dbPool.Close()
-
-	if err := dbPool.Ping(ctx); err != nil {
-		log.Fatalf("PostgreSQL ping failed: %v", err)
-	}
-	log.Println("✓ PostgreSQL connected")
-
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: cfg.RedisURL,
-	})
-	defer redisClient.Close()
-
-	if err := redisClient.Ping(ctx).Err(); err != nil {
-		log.Fatalf("Redis ping failed: %v", err)
-	}
-	log.Println("✓ Redis connected")
-
-	storageClient, err := storage.NewMinIOStorage(
-		cfg.MinIOEndpoint,
-		cfg.MinIOAccessKey,
-		cfg.MinIOSecretKey,
-		cfg.MinIOBucket,
-		cfg.MinIOUseSSL,
-	)
-	if err != nil {
-		log.Fatalf("Failed to initialize MinIO: %v", err)
-	}
-	log.Println("✓ MinIO initialized")
-
-	folderRepo := folders.NewFolderRepository(dbPool)
-	folderService := folders.NewFolderService(folderRepo)
-	folderController := folders.NewFolderController(folderService)
-
-	fileRepo := files.NewFileRepository(dbPool)
-	fileService := files.NewFileService(fileRepo)
-	fileController := files.NewFileController(fileService)
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /health", healthHandler(dbPool, redisClient, storageClient))
-	folderController.RegisterRoutes(mux)
-	fileController.RegisterRoutes(mux)
-
-	server := &http.Server{
-		Addr:         "127.0.0.1:" + cfg.Port,
-		Handler:      corsMiddleware(mux),
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+	defer app.Close()
 
 	go func() {
-		log.Printf("Server listening on %s", server.Addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("Server listening on %s", app.Server.Addr)
+		if err := app.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}
 	}()
@@ -100,14 +40,12 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
-	server.Shutdown(shutdownCtx)
-	dbPool.Close()
-	redisClient.Close()
+	app.Server.Shutdown(shutdownCtx)
 
 	log.Println("Server stopped")
 }
 
-func healthHandler(db *pgxpool.Pool, redis *redis.Client, st storage.Storage) http.HandlerFunc {
+func healthHandler(db *pgxpool.Pool, redis *redis.Client, st *storage.MinIOStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
