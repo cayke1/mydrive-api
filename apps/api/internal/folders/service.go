@@ -77,3 +77,7 @@ func (s *FolderService) DeleteFolder(ctx context.Context, id string) error {
 	}
 	return s.repo.Delete(ctx, id)
 }
+
+func (s *FolderService) GetFolderWithContents(ctx context.Context, id string) (*FolderWithContent, error) {
+	return s.repo.GetByIDWithContents(ctx, id)
+}

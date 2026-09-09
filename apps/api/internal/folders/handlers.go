@@ -74,3 +74,19 @@ func (fc *FolderController) DeleteFolderHandler(w http.ResponseWriter, r *http.R
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (fc *FolderController) GetFolderWithContentsHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		http.Error(w, "Missing folder ID", http.StatusBadRequest)
+		return
+	}
+	folderWithContents, err := fc.service.GetFolderWithContents(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Failed to retrieve folder with contents: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(folderWithContents)
+}

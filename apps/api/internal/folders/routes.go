@@ -7,4 +7,5 @@ func (fc *FolderController) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /folders", fc.GetFoldersHandler)
 	mux.HandleFunc("GET /folders/{id}", fc.GetFolderByIDHandler)
 	mux.HandleFunc("DELETE /folders/{id}", fc.DeleteFolderHandler)
+	mux.HandleFunc("GET /folders/{id}/contents", fc.GetFolderWithContentsHandler)
 }
