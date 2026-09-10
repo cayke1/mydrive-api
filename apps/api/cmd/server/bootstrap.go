@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cayke1/mydrive-api/internal/auth"
 	"github.com/cayke1/mydrive-api/internal/config"
 	"github.com/cayke1/mydrive-api/internal/files"
 	"github.com/cayke1/mydrive-api/internal/folders"
@@ -113,8 +114,13 @@ func (a *App) registerRoutes() {
 	fileService := files.NewFileService(fileRepo)
 	fileController := files.NewFileController(fileService)
 
+	usersRepo := auth.NewUserRepository(a.DB)
+	authService := auth.NewAuthService(usersRepo)
+	authController := auth.NewAuthController(authService)
+
 	folderController.RegisterRoutes(mux)
 	fileController.RegisterRoutes(mux)
+	authController.RegisterRoutes(mux)
 
 	a.Mux = mux
 }
