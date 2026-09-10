@@ -4,10 +4,10 @@
 BEGIN;
 
 -- Users
-INSERT INTO users (id, email, created_at) VALUES
-    ('550e8400-e29b-41d4-a716-446655440001', 'john@example.com', NOW()),
-    ('550e8400-e29b-41d4-a716-446655440002', 'jane@example.com', NOW()),
-    ('550e8400-e29b-41d4-a716-446655440003', 'alice@example.com', NOW())
+INSERT INTO users (id, email, password_hash, session_token, CSRF_token, created_at, updated_at) VALUES
+    ('550e8400-e29b-41d4-a716-446655440001', 'john@example.com', '$2a$12$abc123def456ghi789jkl', 'session_john_001', 'csrf_john_001', NOW(), NOW()),
+    ('550e8400-e29b-41d4-a716-446655440002', 'jane@example.com', '$2a$12$xyz789uvw012pqr345stu', 'session_jane_001', 'csrf_jane_001', NOW(), NOW()),
+    ('550e8400-e29b-41d4-a716-446655440003', 'alice@example.com', '$2a$12$vwx012yza345bcd678efg', 'session_alice_001', 'csrf_alice_001', NOW(), NOW())
 ON CONFLICT (email) DO NOTHING;
 
 -- Root folders for each user
