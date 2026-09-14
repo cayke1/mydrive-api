@@ -17,9 +17,9 @@ func NewFolderController(service *FolderService) *FolderController {
 
 func (fc *FolderController) GetFoldersHandler(w http.ResponseWriter, r *http.Request) {
 	ownerId := r.Context().Value(auth.UserIdKey).(string)
-	folders, err := fc.service.GetFolders(r.Context(), ownerId)
+	folders, err := fc.service.GetUserFolders(r.Context(), ownerId)
 	if err != nil {
-		http.Error(w, "Failed to retrieve folders", http.StatusInternalServerError)
+		http.Error(w, "Failed to retrieve folders", http.StatusNotFound)
 		return
 	}
 
@@ -37,7 +37,7 @@ func (fc *FolderController) GetFolderByIDHandler(w http.ResponseWriter, r *http.
 
 	folder, err := fc.service.GetFolderByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, "Failed to retrieve folder", http.StatusInternalServerError)
+		http.Error(w, "Failed to retrieve folder", http.StatusNotFound)
 		return
 	}
 
@@ -88,7 +88,7 @@ func (fc *FolderController) GetFolderWithContentsHandler(w http.ResponseWriter, 
 	}
 	folderWithContents, err := fc.service.GetFolderWithContents(r.Context(), id)
 	if err != nil {
-		http.Error(w, "Failed to retrieve folder with contents: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to retrieve folder with contents: "+err.Error(), http.StatusNotFound)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -17,26 +17,6 @@ func NewFolderRepository(db *pgxpool.Pool) *FolderRepository {
 	return &FolderRepository{db: db}
 }
 
-func (r *FolderRepository) GetAll(ctx context.Context) ([]Folder, error) {
-	query := `SELECT id, name, created_at, updated_at, parent_id, owner_id
-                FROM folders ORDER BY created_at DESC`
-	rows, err := r.db.Query(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var folders []Folder
-	for rows.Next() {
-		var folder Folder
-		if err := rows.Scan(&folder.ID, &folder.Name, &folder.CreatedAt, &folder.UpdatedAt, &folder.ParentID, &folder.OwnerID); err != nil {
-			return nil, err
-		}
-		folders = append(folders, folder)
-	}
-	return folders, rows.Err()
-}
-
 func (r *FolderRepository) GetByID(ctx context.Context, id string) (*Folder, error) {
 	query := `SELECT id, name, created_at, updated_at, parent_id, owner_id
 				FROM folders WHERE id = $1`
