@@ -64,3 +64,33 @@ func (r *FileRepository) GetByFolderID(ctx context.Context, folderID string) ([]
 	}
 	return files, nil
 }
+
+func (r *FileRepository) GetByID(ctx context.Context, id string) (*File, error) {
+	query := `SELECT id, name, folder_id, owner_id, size, mime_type,
+                                      storage_key, checksum, created_at, updated_at
+                                      FROM files WHERE id = $1`
+
+	var file File
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&file.ID,
+		&file.Name,
+		&file.FolderID,
+		&file.OwnerID,
+		&file.Size,
+		&file.MimeType,
+		&file.StorageKey,
+		&file.Checksum,
+		&file.CreatedAt,
+		&file.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &file, nil
+}
+
+func (r *FileRepository) Delete(ctx context.Context, fileID string) error {
+	query := `DELETE FROM files WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, fileID)
+	return err
+}

@@ -22,3 +22,11 @@ type CreateFileInput struct {
 	Size     int64  `json:"size"`
 	MimeType string `json:"mime_type"`
 }
+
+type UploadFileInput struct {
+	FolderID string `json:"folder_id"`
+	OwnerID  string `json:"owner_id"`
+	Size     int64  `json:"size"`
+	MimeType string `json:"mime_type"`
+	Filename string `json:"filename"`
+}
