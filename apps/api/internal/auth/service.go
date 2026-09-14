@@ -43,7 +43,9 @@ func (s *AuthService) RegisterUser(ctx context.Context, input CreateUserInput) (
 		return nil, err
 	}
 
-	sessionToken, err := utils.GenerateToken(input.Email)
+	userId := uuid.New().String()
+
+	sessionToken, err := utils.GenerateToken(input.Email, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +56,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, input CreateUserInput) (
 
 	now := time.Now().UTC()
 	user := &User{
-		ID:           uuid.New().String(),
+		ID:           userId,
 		Email:        input.Email,
 		PasswordHash: string(passwordHash),
 		SessionToken: sessionToken,
@@ -95,7 +97,7 @@ func (s *AuthService) Login(ctx context.Context, input CreateUserInput) (*User, 
 		return nil, errors.New("invalid email or password")
 	}
 
-	sessionToken, err := utils.GenerateToken(user.Email)
+	sessionToken, err := utils.GenerateToken(user.Email, user.ID)
 	if err != nil {
 		return nil, err
 	}

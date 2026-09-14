@@ -22,14 +22,16 @@ func CheckPasswordHash(password, hash string) bool {
 
 type Claims struct {
 	Email string `json:"email"`
+	ID    string `json:id`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(email string) (string, error) {
+func GenerateToken(email string, id string) (string, error) {
 	var jwtSecret = []byte(config.Load().JwtSecret)
 	expiry := time.Now().Add(24 * time.Hour)
 	claims := Claims{
 		Email:            email,
+		ID:               id,
 		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(expiry)},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
