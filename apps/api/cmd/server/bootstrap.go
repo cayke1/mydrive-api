@@ -128,11 +128,15 @@ func (a *App) registerRoutes() {
 func (a *App) createServer() {
 	a.Server = &http.Server{
 		Addr:         "127.0.0.1:" + a.Config.Port,
-		Handler:      corsMiddleware(a.Mux),
+		Handler:      a.applyMiddlewares(),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+}
+
+func (a *App) applyMiddlewares() http.Handler {
+	return corsMiddleware(auth.AuthMiddleware(a.Mux))
 }
 
 func (a *App) Close() {

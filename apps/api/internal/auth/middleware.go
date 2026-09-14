@@ -15,6 +15,17 @@ type contextKey string
 const EmailKey contextKey = "email"
 const UserIdKey contextKey = "id"
 
+var publicRoutes = map[string]bool{
+	"/health":          true,
+	"/auth/login":      true,
+	"/auth/register":   true,
+	"/auth/logout":     true,
+}
+
+func isPublicRoute(path string) bool {
+	return publicRoutes[path]
+}
+
 func Authorize(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		st, err := r.Cookie("session_token")
@@ -44,5 +55,15 @@ func Authorize(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), EmailKey, claims.Email)
 		ctx = context.WithValue(ctx, UserIdKey, claims.ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isPublicRoute(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		Authorize(next).ServeHTTP(w, r)
 	})
 }
