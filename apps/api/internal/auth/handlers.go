@@ -44,6 +44,8 @@ func (ac *AuthController) RegisterUserHandler(w http.ResponseWriter, r *http.Req
 		Value:    user.SessionToken,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -51,6 +53,8 @@ func (ac *AuthController) RegisterUserHandler(w http.ResponseWriter, r *http.Req
 		Value:    user.CSRFToken,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: false,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	w.Header().Set("Content-Type", "application/json")
@@ -76,6 +80,8 @@ func (ac *AuthController) RegisterLoginHandler(w http.ResponseWriter, r *http.Re
 		Value:    user.SessionToken,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -83,6 +89,8 @@ func (ac *AuthController) RegisterLoginHandler(w http.ResponseWriter, r *http.Re
 		Value:    user.CSRFToken,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: false,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	w.Header().Set("Content-Type", "application/json")
@@ -97,6 +105,8 @@ func (ac *AuthController) RegisterLogoutHandler(w http.ResponseWriter, r *http.R
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -105,6 +115,8 @@ func (ac *AuthController) RegisterLogoutHandler(w http.ResponseWriter, r *http.R
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: false,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	w.Write([]byte("Session cookie cleared"))
