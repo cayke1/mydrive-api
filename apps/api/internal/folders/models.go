@@ -18,7 +18,6 @@ type Folder struct {
 type CreateFolderInput struct {
 	Name     string  `json:"name"`
 	ParentID *string `json:"parent_id,omitempty"`
-	OwnerID  string  `json:"owner_id"`
 }
 
 type FolderWithContent struct {

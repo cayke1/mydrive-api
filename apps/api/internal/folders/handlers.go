@@ -3,6 +3,8 @@ package folders
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/cayke1/mydrive-api/internal/auth"
 )
 
 type FolderController struct {
@@ -14,7 +16,8 @@ func NewFolderController(service *FolderService) *FolderController {
 }
 
 func (fc *FolderController) GetFoldersHandler(w http.ResponseWriter, r *http.Request) {
-	folders, err := fc.service.GetFolders(r.Context())
+	ownerId := r.Context().Value(auth.UserIdKey).(string)
+	folders, err := fc.service.GetFolders(r.Context(), ownerId)
 	if err != nil {
 		http.Error(w, "Failed to retrieve folders", http.StatusInternalServerError)
 		return
@@ -45,12 +48,14 @@ func (fc *FolderController) GetFolderByIDHandler(w http.ResponseWriter, r *http.
 
 func (fc *FolderController) CreateFoldersHandler(w http.ResponseWriter, r *http.Request) {
 	var input CreateFolderInput
+
+	ownerID := r.Context().Value(auth.UserIdKey).(string)
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	folder, err := fc.service.CreateFolder(r.Context(), &input)
+	folder, err := fc.service.CreateFolder(r.Context(), &input, ownerID)
 	if err != nil {
 		http.Error(w, "Failed to create folder: "+err.Error(), http.StatusInternalServerError)
 		return

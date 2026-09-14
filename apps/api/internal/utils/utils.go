@@ -22,7 +22,7 @@ func CheckPasswordHash(password, hash string) bool {
 
 type Claims struct {
 	Email string `json:"email"`
-	ID    string `json:id`
+	ID    string `json:"id"`
 	jwt.RegisteredClaims
 }
 

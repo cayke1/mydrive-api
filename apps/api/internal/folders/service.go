@@ -17,8 +17,8 @@ func NewFolderService(repo *FolderRepository) *FolderService {
 	return &FolderService{repo: repo}
 }
 
-func (s *FolderService) GetFolders(ctx context.Context) ([]Folder, error) {
-	return s.repo.GetAll(ctx)
+func (s *FolderService) GetFolders(ctx context.Context, ownerId string) ([]Folder, error) {
+	return s.repo.GetByOwner(ctx, ownerId)
 }
 
 func (s *FolderService) GetFolderByID(ctx context.Context, id string) (*Folder, error) {
@@ -29,14 +29,14 @@ func (s *FolderService) GetUserFolders(ctx context.Context, userID string) ([]Fo
 	return s.repo.GetByOwner(ctx, userID)
 }
 
-func (s *FolderService) CreateFolder(ctx context.Context, input *CreateFolderInput) (*Folder, error) {
+func (s *FolderService) CreateFolder(ctx context.Context, input *CreateFolderInput, ownerID string) (*Folder, error) {
 	if input.Name == "" {
 		return nil, errors.New("folder name is required")
 	}
 	if len(input.Name) > 255 {
 		return nil, errors.New("folder name exceeds maximum length of 255 characters")
 	}
-	if input.OwnerID == "" {
+	if ownerID == "" {
 		return nil, errors.New("owner ID is required")
 	}
 
@@ -55,7 +55,7 @@ func (s *FolderService) CreateFolder(ctx context.Context, input *CreateFolderInp
 		ID:        uuid.New().String(),
 		Name:      input.Name,
 		ParentID:  input.ParentID,
-		OwnerID:   input.OwnerID,
+		OwnerID:   ownerID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
