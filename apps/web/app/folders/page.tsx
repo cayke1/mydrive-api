@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthCheck } from '@/app/lib/useAuthCheck'
+import FilePreviewModal from './FilePreviewModal'
 
 interface File {
   id: string
@@ -34,6 +35,14 @@ export default function FoldersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [previewFile, setPreviewFile] = useState<{
+    meta: File
+    url: string
+    text?: string
+  } | null>(null)
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
   useEffect(() => {
@@ -155,6 +164,117 @@ export default function FoldersPage() {
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!currentFolder || !e.target.files?.[0]) return
+    const file = e.target.files[0]
+    setIsUploading(true)
+    setError(null)
+    const formData = new FormData()
+    formData.append('folder_id', currentFolder.id)
+    formData.append('file', file)
+    try {
+      const response = await fetch(`${apiUrl}/files/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
+      if (!response.ok) throw new Error(`Upload failed: ${response.status}`)
+      const newFile: File = await response.json()
+      setCurrentFolder((prev) =>
+        prev
+          ? { ...prev, files: [...(prev.files || []), newFile] }
+          : null
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleDownload = async (file: File) => {
+    try {
+      const response = await fetch(`${apiUrl}/files/${file.id}/download`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
+      if (!response.ok) throw new Error('Download failed')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download failed')
+    }
+  }
+
+  const handlePreview = async (file: File) => {
+    setIsLoadingPreview(true)
+    try {
+      const response = await fetch(`${apiUrl}/files/${file.id}/download`, {
+        credentials: 'include',
+      })
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
+      if (!response.ok) throw new Error('Preview failed')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      let text: string | undefined
+      if (file.mime_type.startsWith('text/')) text = await blob.text()
+      setPreviewFile({ meta: file, url, text })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Preview failed')
+    } finally {
+      setIsLoadingPreview(false)
+    }
+  }
+
+  const closePreview = () => {
+    if (previewFile) URL.revokeObjectURL(previewFile.url)
+    setPreviewFile(null)
+  }
+
+  const handleDelete = async (file: File) => {
+    if (!confirm(`Delete "${file.name}"?`)) return
+    try {
+      const response = await fetch(`${apiUrl}/files/${file.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
+      if (!response.ok) throw new Error('Delete failed')
+      setCurrentFolder((prev) =>
+        prev
+          ? {
+              ...prev,
+              files: (prev.files || []).filter((f) => f.id !== file.id),
+            }
+          : null
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -202,7 +322,7 @@ export default function FoldersPage() {
       <div className="max-w-6xl mx-auto px-8 py-8">
         {/* Controls */}
         {currentFolder && (
-          <div className="mb-6">
+          <div className="mb-6 flex gap-4">
             <button
               onClick={navigateBack}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -222,6 +342,32 @@ export default function FoldersPage() {
               </svg>
               Back
             </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition-colors"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3v-6"
+                />
+              </svg>
+              {isUploading ? 'Uploading...' : 'Upload File'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
           </div>
         )}
 
@@ -349,6 +495,9 @@ export default function FoldersPage() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                               Modified
                             </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -384,6 +533,27 @@ export default function FoldersPage() {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {formatDate(file.updated_at)}
                               </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                                <button
+                                  onClick={() => handlePreview(file)}
+                                  disabled={isLoadingPreview}
+                                  className="px-3 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
+                                >
+                                  Preview
+                                </button>
+                                <button
+                                  onClick={() => handleDownload(file)}
+                                  className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                                >
+                                  Download
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(file)}
+                                  className="px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -417,6 +587,15 @@ export default function FoldersPage() {
           </div>
         )}
       </div>
+
+      {previewFile && (
+        <FilePreviewModal
+          file={previewFile.meta}
+          url={previewFile.url}
+          text={previewFile.text}
+          onClose={closePreview}
+        />
+      )}
     </main>
   )
 }
