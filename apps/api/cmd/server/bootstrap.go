@@ -111,7 +111,7 @@ func (a *App) registerRoutes() {
 	folderController := folders.NewFolderController(folderService)
 
 	fileRepo := files.NewFileRepository(a.DB)
-	fileService := files.NewFileService(fileRepo)
+	fileService := files.NewFileService(fileRepo, a.Storage)
 	fileController := files.NewFileController(fileService)
 
 	usersRepo := auth.NewUserRepository(a.DB)
