@@ -1,0 +1,2 @@
+ALTER TABLE users DROP COLUMN session_token;
+ALTER TABLE users DROP COLUMN CSRF_token;

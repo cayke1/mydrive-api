@@ -8,6 +8,7 @@ import (
 	"github.com/cayke1/mydrive-api/internal/config"
 	"github.com/cayke1/mydrive-api/internal/utils"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 )
 
 type contextKey string
@@ -26,7 +27,7 @@ func isPublicRoute(path string) bool {
 	return publicRoutes[path]
 }
 
-func Authorize(next http.Handler) http.Handler {
+func Authorize(redis *redis.Client, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		st, err := r.Cookie("session_token")
 		if err != nil {
@@ -51,6 +52,20 @@ func Authorize(next http.Handler) http.Handler {
 			return
 		}
 
+		redisKey := "session:" + st.Value
+		exists, err := redis.Exists(r.Context(), redisKey).Result()
+		if err != nil {
+			log.Printf("[AUTH] Error checking Redis session: %v", err)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if exists == 0 {
+			log.Printf("[AUTH] Session not found in Redis - key: %s", redisKey)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		log.Printf("[AUTH] Session found in Redis - key: %s", redisKey)
+
 		log.Printf("[AUTH] Token valid for user: %s", claims.Email)
 		ctx := context.WithValue(r.Context(), EmailKey, claims.Email)
 		ctx = context.WithValue(ctx, UserIdKey, claims.ID)
@@ -58,12 +73,14 @@ func Authorize(next http.Handler) http.Handler {
 	})
 }
 
-func AuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isPublicRoute(r.URL.Path) {
-			next.ServeHTTP(w, r)
-			return
-		}
-		Authorize(next).ServeHTTP(w, r)
-	})
+func AuthMiddleware(redis *redis.Client) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if isPublicRoute(r.URL.Path) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			Authorize(redis, next).ServeHTTP(w, r)
+		})
+	}
 }

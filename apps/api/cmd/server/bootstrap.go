@@ -115,8 +115,8 @@ func (a *App) registerRoutes() {
 	fileController := files.NewFileController(fileService)
 
 	usersRepo := auth.NewUserRepository(a.DB)
-	authService := auth.NewAuthService(usersRepo)
-	authController := auth.NewAuthController(authService)
+	authService := auth.NewAuthService(usersRepo, a.Redis)
+	authController := auth.NewAuthController(authService, a.Redis)
 
 	folderController.RegisterRoutes(mux)
 	fileController.RegisterRoutes(mux)
@@ -136,7 +136,7 @@ func (a *App) createServer() {
 }
 
 func (a *App) applyMiddlewares() http.Handler {
-	return corsMiddleware(auth.AuthMiddleware(a.Mux))
+	return corsMiddleware(auth.AuthMiddleware(a.Redis)(a.Mux))
 }
 
 func (a *App) Close() {

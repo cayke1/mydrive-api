@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type AuthController struct {
 	service *AuthService
+	redis   *redis.Client
 }
 
-func NewAuthController(service *AuthService) *AuthController {
-	return &AuthController{service: service}
+func NewAuthController(service *AuthService, redis *redis.Client) *AuthController {
+	return &AuthController{service: service, redis: redis}
 }
 
 func (ac *AuthController) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +102,11 @@ func (ac *AuthController) RegisterLoginHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (ac *AuthController) RegisterLogoutHandler(w http.ResponseWriter, r *http.Request) {
+	st, err := r.Cookie("session_token")
+	if err == nil && st.Value != "" {
+		ac.redis.Del(r.Context(), "session:"+st.Value)
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    "",

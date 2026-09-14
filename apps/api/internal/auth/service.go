@@ -3,18 +3,21 @@ package auth
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/cayke1/mydrive-api/internal/utils"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 type AuthService struct {
-	repo *UserRepository
+	repo  *UserRepository
+	Redis *redis.Client
 }
 
-func NewAuthService(repo *UserRepository) *AuthService {
-	return &AuthService{repo: repo}
+func NewAuthService(repo *UserRepository, redis *redis.Client) *AuthService {
+	return &AuthService{repo: repo, Redis: redis}
 }
 
 func (s *AuthService) GetUsers(ctx context.Context) ([]User, error) {
@@ -71,6 +74,13 @@ func (s *AuthService) RegisterUser(ctx context.Context, input CreateUserInput) (
 		return nil, err
 	}
 
+	redisKey := "session:" + sessionToken
+	if err := s.Redis.Set(ctx, redisKey, userId, 24*time.Hour).Err(); err != nil {
+		log.Printf("[AUTH] Failed to store session in Redis: %v", err)
+		return nil, err
+	}
+	log.Printf("[AUTH] Session stored in Redis with key: %s, value: %s", redisKey, userId)
+
 	return user, nil
 }
 
@@ -107,17 +117,16 @@ func (s *AuthService) Login(ctx context.Context, input CreateUserInput) (*User, 
 		return nil, err
 	}
 
-	query := &UpdateUserInput{
-		ID:           user.ID,
-		SessionToken: sessionToken,
-		CSRFToken:    csrfToken,
-		UpdatedAt:    time.Now(),
-	}
-
-	updatedUser, err := s.repo.UpdateSession(ctx, query)
-	if err != nil {
+	redisKey := "session:" + sessionToken
+	if err := s.Redis.Set(ctx, redisKey, user.ID, 24*time.Hour).Err(); err != nil {
+		log.Printf("[AUTH] Failed to store session in Redis: %v", err)
 		return nil, err
 	}
+	log.Printf("[AUTH] Session stored in Redis with key: %s, value: %s", redisKey, user.ID)
 
-	return updatedUser, nil
+	user.SessionToken = sessionToken
+	user.CSRFToken = csrfToken
+	user.UpdatedAt = time.Now()
+
+	return user, nil
 }
