@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuthCheck } from '@/app/lib/useAuthCheck'
 
 interface File {
   id: string
@@ -23,11 +25,15 @@ interface Folder {
 }
 
 export default function FoldersPage() {
+  const router = useRouter()
+  useAuthCheck()
+
   const [rootFolders, setRootFolders] = useState<Folder[]>([])
   const [folderStack, setFolderStack] = useState<Folder[]>([])
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
   useEffect(() => {
@@ -38,10 +44,25 @@ export default function FoldersPage() {
     setLoading(true)
     setError(null)
     try {
+      console.log('[fetchRootFolders] Starting request')
+      console.log('[fetchRootFolders] API URL:', apiUrl)
+      console.log('[fetchRootFolders] Document cookie:', document.cookie)
+
       const response = await fetch(`${apiUrl}/folders`, {
         method: 'GET',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       })
+
+      console.log('[fetchRootFolders] Response status:', response.status)
+      console.log('[fetchRootFolders] Response headers:', response.headers)
+
+      if (response.status === 401) {
+        const errorText = await response.text()
+        console.log('[fetchRootFolders] 401 Unauthorized. Response body:', errorText)
+        router.push('/login')
+        return
+      }
 
       if (!response.ok) throw new Error(`API error: ${response.status}`)
 
@@ -51,6 +72,7 @@ export default function FoldersPage() {
       setCurrentFolder(null)
       setFolderStack([])
     } catch (err) {
+      console.log('[fetchRootFolders] Error:', err)
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setLoading(false)
@@ -63,8 +85,14 @@ export default function FoldersPage() {
     try {
       const response = await fetch(`${apiUrl}/folders/${folderId}/contents`, {
         method: 'GET',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       })
+
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
 
       if (!response.ok) throw new Error(`API error: ${response.status}`)
 
@@ -115,6 +143,18 @@ export default function FoldersPage() {
     })
   }
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await fetch(`${apiUrl}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+    } finally {
+      router.push('/login')
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -122,6 +162,13 @@ export default function FoldersPage() {
         <div className="max-w-6xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold text-gray-900">MyDrive Explorer</h1>
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoggingOut ? 'Logging out...' : 'Logout'}
+            </button>
           </div>
 
           {/* Breadcrumb */}
