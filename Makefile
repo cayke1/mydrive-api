@@ -13,11 +13,11 @@ help:
 	@echo "MyDrive - Local Development Commands"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev            - Start with hot reload (auto-rebuild on code changes)"
-	@echo "  make dev-logs       - Show dev logs"
+	@echo "  make dev            - Start services only (postgres, redis, minio)"
+	@echo "  make dev-logs       - Show services logs"
 	@echo ""
 	@echo "Production:"
-	@echo "  make up             - Start containers in background"
+	@echo "  make up             - Start all containers in background (API, Web, services)"
 	@echo "  make down           - Stop and remove containers"
 	@echo "  make restart        - Restart all containers"
 	@echo "  make logs           - Show container logs (follow mode)"
@@ -38,11 +38,23 @@ help:
 	@echo ""
 
 dev:
-	@echo "Starting development environment with hot reload..."
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+	@echo "Starting development services (postgres, redis, minio)..."
+	docker compose -f docker-compose.services.yml up
+	@echo ""
+	@echo "✓ Services started"
+	@echo ""
+	@echo "Services available at:"
+	@echo "  - PostgreSQL: localhost:5432"
+	@echo "  - Redis:      localhost:6379"
+	@echo "  - MinIO:      http://localhost:9000 (API)"
+	@echo "  - MinIO:      http://localhost:9001 (Console)"
+	@echo ""
+	@echo "To start API/Web, run them locally:"
+	@echo "  - cd apps/api && go run ./cmd/server"
+	@echo "  - cd apps/web && npm run dev"
 
 dev-logs:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
+	docker compose -f docker-compose.services.yml logs -f
 
 up:
 	docker compose up -d
