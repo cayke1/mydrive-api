@@ -17,10 +17,10 @@ const EmailKey contextKey = "email"
 const UserIdKey contextKey = "id"
 
 var publicRoutes = map[string]bool{
-	"/health":          true,
-	"/auth/login":      true,
-	"/auth/register":   true,
-	"/auth/logout":     true,
+	"/health":        true,
+	"/auth/login":    true,
+	"/auth/register": true,
+	"/auth/logout":   true,
 }
 
 func isPublicRoute(path string) bool {
@@ -83,4 +83,17 @@ func AuthMiddleware(redis *redis.Client) func(http.Handler) http.Handler {
 			Authorize(redis, next).ServeHTTP(w, r)
 		})
 	}
+}
+
+func ErrorMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("Recovered from panic: %v", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
 }

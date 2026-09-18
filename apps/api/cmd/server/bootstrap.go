@@ -136,7 +136,7 @@ func (a *App) createServer() {
 }
 
 func (a *App) applyMiddlewares() http.Handler {
-	return corsMiddleware(auth.AuthMiddleware(a.Redis)(a.Mux))
+	return auth.ErrorMiddleware(corsMiddleware(auth.AuthMiddleware(a.Redis)(a.Mux)))
 }
 
 func (a *App) Close() {
