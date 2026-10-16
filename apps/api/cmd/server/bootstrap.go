@@ -10,18 +10,20 @@ import (
 	"github.com/cayke1/mydrive-api/internal/config"
 	"github.com/cayke1/mydrive-api/internal/files"
 	"github.com/cayke1/mydrive-api/internal/folders"
+	"github.com/cayke1/mydrive-api/internal/jobs"
 	"github.com/cayke1/mydrive-api/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
 type App struct {
-	DB      *pgxpool.Pool
-	Redis   *redis.Client
-	Storage *storage.MinIOStorage
-	Config  config.Config
-	Mux     *http.ServeMux
-	Server  *http.Server
+	DB         *pgxpool.Pool
+	Redis      *redis.Client
+	Storage    *storage.MinIOStorage
+	Config     config.Config
+	Mux        *http.ServeMux
+	Server     *http.Server
+	Dispatcher jobs.JobQueue
 }
 
 func bootstrap() (*App, error) {
@@ -112,7 +114,8 @@ func (a *App) registerRoutes() {
 
 	fileRepo := files.NewFileRepository(a.DB)
 	fileService := files.NewFileService(fileRepo, a.Storage)
-	fileController := files.NewFileController(fileService)
+	a.Dispatcher = a.initializeJobDispatcher(fileService)
+	fileController := files.NewFileController(fileService, a.Dispatcher)
 
 	usersRepo := auth.NewUserRepository(a.DB)
 	authService := auth.NewAuthService(usersRepo, a.Redis)
@@ -146,4 +149,46 @@ func (a *App) Close() {
 	if a.Redis != nil {
 		a.Redis.Close()
 	}
+}
+
+func (a *App) initializeJobDispatcher(fileService *files.FileService) jobs.JobQueue {
+	queueCapacity := 100
+	workerCount := 3
+
+	// Create handlers
+	thumbnailHandler := jobs.NewThumbnailHandler(a.Storage)
+
+	// Wrap FileService to match jobs.FileService interface
+	fsWrapper := &fileServiceWrapper{fileService: fileService}
+	metadataHandler := jobs.NewMetadataHandler(a.Storage, fsWrapper)
+
+	// Create a composite handler that routes to the correct handler
+	compositeHandler := &jobs.CompositeJobHandler{
+		ThumbnailHandler: thumbnailHandler,
+		MetadataHandler:  metadataHandler,
+	}
+
+	// Create dispatcher
+	dispatcher := jobs.NewJobDispatcher(queueCapacity, compositeHandler)
+
+	ctx := context.Background()
+	if err := dispatcher.Start(ctx, workerCount); err != nil {
+		log.Fatalf("Failed to start job dispatcher: %v", err)
+	}
+
+	log.Printf("✓ Job dispatcher started with %d workers (queue capacity: %d)", workerCount, queueCapacity)
+	return dispatcher
+}
+
+// fileServiceWrapper adapts *files.FileService to jobs.FileService interface
+type fileServiceWrapper struct {
+	fileService *files.FileService
+}
+
+func (w *fileServiceWrapper) GetFileByID(ctx context.Context, fileID string) (interface{}, error) {
+	return w.fileService.GetFileByID(ctx, fileID)
+}
+
+func (w *fileServiceWrapper) UpdateFileMetadata(ctx context.Context, fileID string, metadata string) error {
+	return w.fileService.UpdateFileMetadata(ctx, fileID, metadata)
 }
