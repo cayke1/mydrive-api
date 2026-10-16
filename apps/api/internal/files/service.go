@@ -15,15 +15,31 @@ import (
 
 type FileService struct {
 	repo    *FileRepository
-	storage *storage.MinIOStorage
+	storage storage.Storage
 }
 
-func NewFileService(repo *FileRepository, storage *storage.MinIOStorage) *FileService {
+func NewFileService(repo *FileRepository, storage storage.Storage) *FileService {
 	return &FileService{repo: repo, storage: storage}
 }
 
 func (s *FileService) GetFilesByFolderID(ctx context.Context, folderID string) ([]File, error) {
 	return s.repo.GetByFolderID(ctx, folderID)
+}
+
+func (s *FileService) GetFileByID(ctx context.Context, fileID string) (*File, error) {
+	return s.repo.GetByID(ctx, fileID)
+}
+
+func (s *FileService) UpdateFileMetadata(ctx context.Context, fileID string, metadata string) error {
+	file, err := s.verifyOwnership(ctx, fileID)
+	if err != nil {
+		return err
+	}
+
+	file.Metadata = metadata
+	file.UpdatedAt = time.Now()
+
+	return s.repo.UpdateMetadata(ctx, file.ID, file.Metadata)
 }
 
 func (s *FileService) verifyOwnership(ctx context.Context, fileID string) (*File, error) {
@@ -95,10 +111,19 @@ func (s *FileService) DeleteFile(ctx context.Context, fileID string) error {
 		return err
 	}
 
+	// Delete main file
 	if err := s.storage.Delete(ctx, file.StorageKey); err != nil {
 		return err
 	}
 
+	// Delete thumbnail if exists
+	thumbnailKey := fmt.Sprintf("%s-thumb.jpg", fileID)
+	if err := s.storage.Delete(ctx, thumbnailKey); err != nil {
+		// Log but don't fail - thumbnail might not exist
+		fmt.Printf("[FILES] Warning: failed to delete thumbnail %s: %v\n", thumbnailKey, err)
+	}
+
+	// Delete from database
 	if err := s.repo.Delete(ctx, fileID); err != nil {
 		return err
 	}
