@@ -11,6 +11,7 @@ type File struct {
 	MimeType   string    `json:"mime_type"`
 	StorageKey string    `json:"storage_key"`
 	Checksum   string    `json:"checksum"`
+	Metadata   string    `json:"metadata"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

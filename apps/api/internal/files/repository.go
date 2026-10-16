@@ -94,3 +94,9 @@ func (r *FileRepository) Delete(ctx context.Context, fileID string) error {
 	_, err := r.db.Exec(ctx, query, fileID)
 	return err
 }
+
+func (r *FileRepository) UpdateMetadata(ctx context.Context, fileID string, metadata string) error {
+	query := `UPDATE files SET metadata = $1, updated_at = NOW() WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, metadata, fileID)
+	return err
+}
