@@ -1,21 +1,26 @@
 package files
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/cayke1/mydrive-api/internal/auth"
+	"github.com/cayke1/mydrive-api/internal/jobs"
+	"github.com/google/uuid"
 )
 
 type FileController struct {
-	service *FileService
+	service    *FileService
+	dispatcher jobs.JobQueue
 }
 
-func NewFileController(service *FileService) *FileController {
-	return &FileController{service: service}
+func NewFileController(service *FileService, dispatcher jobs.JobQueue) *FileController {
+	return &FileController{service: service, dispatcher: dispatcher}
 }
 
 func (fc *FileController) GetFilesByFolderIDHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +83,50 @@ func (fc *FileController) UploadFileHandler(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(uploadedFile)
+	fc.enqueuePostUploadJobs(r.Context(), uploadedFile)
+}
+
+func (fc *FileController) enqueuePostUploadJobs(ctx context.Context, file *File) {
+	userID, ok := ctx.Value(auth.UserIdKey).(string)
+	if !ok {
+		log.Printf("[FILES] ❌ Failed to extract userID from context for file %s", file.ID)
+		return
+	}
+
+	basePayload := &jobs.BasePayload{
+		FileID:     file.ID,
+		StorageKey: file.StorageKey,
+		MimeType:   file.MimeType,
+		UserID:     userID,
+	}
+
+	thumbnailJob := &jobs.Job{
+		ID:         uuid.New().String(),
+		Type:       jobs.JobTypeThumbnail,
+		Payload:    &jobs.ThumbnailPayload{BasePayload: basePayload},
+		Ctx:        ctx,
+		MaxRetries: 3,
+		CreatedAt:  time.Now(),
+	}
+
+	if err := fc.dispatcher.Enqueue(ctx, thumbnailJob); err != nil {
+		log.Printf("[FILES] ❌ Failed to enqueue thumbnail job for file %s: %v", file.ID, err)
+	}
+
+	metadataJob := &jobs.Job{
+		ID:         uuid.New().String(),
+		Type:       jobs.JobTypeMetadata,
+		Payload:    &jobs.MetadataPayload{BasePayload: basePayload},
+		Ctx:        ctx,
+		MaxRetries: 2,
+		CreatedAt:  time.Now(),
+	}
+
+	if err := fc.dispatcher.Enqueue(ctx, metadataJob); err != nil {
+		log.Printf("[FILES] ❌ Failed to enqueue metadata job for file %s: %v", file.ID, err)
+	}
+
+	log.Printf("[FILES] ✓ Enqueued background jobs for file %s", file.ID)
 }
 
 func (fc *FileController) DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
